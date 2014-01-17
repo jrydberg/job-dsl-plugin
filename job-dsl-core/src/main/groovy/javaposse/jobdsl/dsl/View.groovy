@@ -60,7 +60,6 @@ public abstract class View {
     }
 
     protected void execute(Closure rootClosure) {
-        rootClosure.resolveStrategy = Closure.DELEGATE_FIRST
         withXmlActions << new WithXmlAction(rootClosure)
     }
 

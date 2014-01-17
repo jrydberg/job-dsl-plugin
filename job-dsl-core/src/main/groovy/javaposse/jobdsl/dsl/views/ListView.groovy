@@ -24,7 +24,6 @@ class ListView extends View {
 
     void jobs(Closure jobsClosure) {
         JobsContext context = new JobsContext()
-        jobsClosure.resolveStrategy = Closure.DELEGATE_FIRST
         executeInContext(jobsClosure, context)
 
         this.jobNames.addAll(context.jobNames)
@@ -44,7 +43,6 @@ class ListView extends View {
 
     void columns(Closure columnsClosure) {
         ColumnsContext context = new ColumnsContext()
-        columnsClosure.resolveStrategy = Closure.DELEGATE_FIRST
         executeInContext(columnsClosure, context)
 
         execute {

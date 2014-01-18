@@ -19,6 +19,14 @@ public abstract class JobParent extends Script {
         queueToBuild = Lists.newArrayList()
     }
 
+    public Pipeline pipeline(Closure closure) {
+        Pipeline pipeline = new Pipeline(jm);
+        pipeline.with(closure)
+        pipeline.chain()
+        pipeline.jobs.each() { referencedJobs << it }
+        return pipeline;
+    }
+
     public Job job(Map<String, Object> arguments=[:], Closure closure) {
         LOGGER.log(Level.FINE, "Got closure and have ${jm}")
         Job job = new Job(jm, arguments)

@@ -1,5 +1,23 @@
 [![Build Status](https://jenkins.ci.cloudbees.com/job/plugins/job/job-dsl-plugin/badge/icon)](https://jenkins.ci.cloudbees.com/job/plugins/job/job-dsl-plugin/)
 
+Pipeline extension for Jenkins Job DSL
+======================================
+
+This is a version of the Jenkins Job DSL plugin that extends it with a "pipeline" directive:
+
+```groovy
+
+pipeline {
+  stage("build") {
+    shell("make")
+  }
+
+  stage("install") {
+    shell("make install")
+  }
+}
+```
+
 Jenkins Job DSL / Plugin
 ========================
 

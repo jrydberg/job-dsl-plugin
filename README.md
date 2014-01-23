@@ -18,6 +18,12 @@ pipeline {
 }
 ```
 
+To try it out, put a DSL `test.pipeline` file in `job-dsl-core/` and run:
+
+    $ JOB_NAME=test_00 ./gradlew run -Pargs=test.pipeline
+
+The generated XML configurations will end up in `job-dsl-core/`.
+
 Jenkins Job DSL / Plugin
 ========================
 

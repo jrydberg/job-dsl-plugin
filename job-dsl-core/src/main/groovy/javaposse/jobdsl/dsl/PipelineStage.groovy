@@ -26,14 +26,17 @@ public class PipelineStage {
 
     JobManagement jobManagement
     List<Job> jobs;
+    String jobName;
     String projectName;
     String name;
     int totalJobs;
-
+    boolean manual;
+    String artifacts;
+  
     public PipelineStage(JobManagement jobManagement, int totalJobs, String name) {
         this.jobManagement = jobManagement;
         this.jobs = Lists.newArrayList()
-	def jobName = jobManagement.getParameters().get("JOB_NAME");
+	this.jobName = jobManagement.getParameters().get("JOB_NAME");
 	this.projectName = jobName.size() > 0 ? jobName.split("_")[0] : jobName;
         this.name = name;
         this.totalJobs = totalJobs;
@@ -43,9 +46,9 @@ public class PipelineStage {
     	String.format("%s_%02d", projectName, totalJobs + i);
     }
 
-    public Job task(String name, Closure closure) {
+    public Job task(String name, Map<String, Object> args=[:], Closure closure) {
         LOGGER.log(Level.FINE, "Got closure and have ${jobManagement}")
-        Job job = new Job(jobManagement)
+        Job job = new Job(jobManagement, args)
 
 	job.name(makeJobName(jobs.size() + 1))
 	job.displayName(String.format("%s (%s %s)", job.name, this.name, name))
@@ -53,7 +56,7 @@ public class PipelineStage {
             // The fist task in a stage needs to import the artifacts from the last
             // build of the previous stage
             job.steps {
-                copyArtifacts(makeJobName(jobs.size()), '**/*.jar', '', true, true) {
+                copyArtifacts(makeJobName(jobs.size()), '**', false, true) {
                     upstreamBuild()
                 }
             }
@@ -75,6 +78,14 @@ public class PipelineStage {
 	return job
     }
 
+    public void manual(boolean value) {
+        manual = value
+    }
+
+    public void publish(String artifacts) {
+        this.artifacts = artifacts
+    }
+    
     public void chain() {
         jobs.size > 1 && jobs[1..-1].eachWithIndex { dn, i ->
             def up = jobs[i]

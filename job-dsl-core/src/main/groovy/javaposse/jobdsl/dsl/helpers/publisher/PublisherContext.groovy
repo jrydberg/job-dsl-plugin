@@ -470,18 +470,26 @@ class PublisherContext implements Context {
      </hudson.tasks.BuildTrigger>
      */
     def downstream(String projectName, String thresholdName = 'SUCCESS') {
-        assert DownstreamContext.THRESHOLD_COLOR_MAP.containsKey(thresholdName), "thresholdName must be one of these values ${DownstreamContext.THRESHOLD_COLOR_MAP.keySet().join(',')}"
+        assert DownstreamContext.THRESHOLD_COLOR_MAP.containsKey(thresholdName) || thresholdName == 'MANUAL', "thresholdName must be one of these values ${DownstreamContext.THRESHOLD_COLOR_MAP.keySet().join(',')},MANUAL"
 
         def nodeBuilder = new NodeBuilder()
-        Node publishNode = nodeBuilder.'hudson.tasks.BuildTrigger' {
-            childProjects projectName
-            threshold {
-                delegate.createNode('name', thresholdName)
-                ordinal DownstreamContext.THRESHOLD_ORDINAL_MAP[thresholdName]
-                color DownstreamContext.THRESHOLD_COLOR_MAP[thresholdName]
+        Node publishNode
+        if (thresholdName == 'MANUAL') {
+            def attr = ['plugin': 'build-pipeline-plugin@1.4.2']
+            publishNode = nodeBuilder.'au.com.centrumsystems.hudson.plugin.buildpipeline.trigger.BuildPipelineTrigger'(attr) {
+                downstreamProjectNames projectName
+                configs ''
+            }
+        } else {
+            publishNode = nodeBuilder.'hudson.tasks.BuildTrigger' {
+                childProjects projectName
+                threshold {
+                    delegate.createNode('name', thresholdName)
+                    ordinal DownstreamContext.THRESHOLD_ORDINAL_MAP[thresholdName]
+                    color DownstreamContext.THRESHOLD_COLOR_MAP[thresholdName]
+                }
             }
         }
-
         publisherNodes << publishNode
     }
 

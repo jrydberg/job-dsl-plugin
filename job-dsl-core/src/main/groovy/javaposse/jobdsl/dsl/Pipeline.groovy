@@ -40,8 +40,8 @@ public class Pipeline {
         PipelineStage stage = new PipelineStage(jobManagement, totalJobs, name)
         stage.with(closure)
         totalJobs += stage.jobs.size()
-        
-        // Save jobs, so that we know what to extract XML from
+
+        // Save stages, we chain them together later
  	stages.push(stage)
 	return stage
     }
@@ -52,10 +52,10 @@ public class Pipeline {
         stages.size > 1 && stages[1..-1].eachWithIndex { dn, i ->
             def up = stages[i]
             up.jobs[-1].publishers {
-                downstream(dn.jobs[0].name)
+                downstream(dn.jobs[0].name, dn.manual ? 'MANUAL' : 'SUCCESS')
                 archiveArtifacts {
-                    pattern '**/build/*.jar'
-                    allowEmpty
+                    pattern up.getArtifacts() ?: '**'
+                    allowEmpty true
                 }
             }
         }

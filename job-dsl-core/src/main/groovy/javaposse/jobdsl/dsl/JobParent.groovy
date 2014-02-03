@@ -23,7 +23,18 @@ public abstract class JobParent extends Script {
         Pipeline pipeline = new Pipeline(jm);
         pipeline.with(closure)
         pipeline.chain()
-        pipeline.jobs.each() { referencedJobs << it }
+        pipeline.stages.each { stage ->
+          stage.jobs.each { job ->
+            job.quietPeriod(0)
+            referencedJobs << job
+          }
+        }
+	def jobName = jm.getParameters().get("JOB_NAME");
+        def firstJob = pipeline.stages[0].jobs[0]
+        firstJob.wrappers {
+          runOnSameNodeAs(jobName, true)
+        }
+        queue(firstJob)
         return pipeline;
     }
 

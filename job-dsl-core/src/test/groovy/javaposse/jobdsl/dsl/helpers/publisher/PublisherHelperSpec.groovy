@@ -130,7 +130,7 @@ public class PublisherHelperSpec extends Specification {
         archiveNode.artifacts[0].value() == 'include/*'
         archiveNode.excludes[0].value() == 'exclude/*'
         archiveNode.latestOnly[0].value() == 'true'
-
+        archiveNode.allowEmptyArchive.isEmpty()
     }
 
     def 'call archive artifacts least args'() {
@@ -143,7 +143,25 @@ public class PublisherHelperSpec extends Specification {
         archiveNode.artifacts[0].value() == 'include/*'
         archiveNode.excludes.isEmpty()
         archiveNode.latestOnly[0].value() == 'false'
+        archiveNode.allowEmptyArchive.isEmpty()
+    }
 
+    def 'call archive artifacts with closure'() {
+        when:
+        context.archiveArtifacts {
+            pattern 'include/*'
+            exclude 'exclude/*'
+            allowEmpty()
+            latestOnly()
+        }
+
+        then:
+        Node archiveNode = context.publisherNodes[0]
+        archiveNode.name() == 'hudson.tasks.ArtifactArchiver'
+        archiveNode.artifacts[0].value() == 'include/*'
+        archiveNode.excludes[0].value() == 'exclude/*'
+        archiveNode.latestOnly[0].value() == 'true'
+        archiveNode.allowEmptyArchive[0].value() == 'true'
     }
 
     def 'call junit archive with all args'() {
@@ -625,7 +643,7 @@ public class PublisherHelperSpec extends Specification {
         publisherNode.config[0].fauxProjectPath[0].value() == ''
         publisherNode.config[0].encoding[0].value() == 'default'
         def typeConfigsNode = publisherNode.config[0].typeConfigs[0]
-        typeConfigsNode.entry.size() == 16
+        typeConfigsNode.entry.size() == 17
         def simianNode = typeConfigsNode.entry.find { it.string[0].value() == 'simian'}
         simianNode != null
         def typeConfigNode = simianNode.'hudson.plugins.violations.TypeConfig'[0]
@@ -644,6 +662,7 @@ public class PublisherHelperSpec extends Specification {
             fauxProjectPath 'faux path'
             perFileDisplayLimit 51
             checkstyle(10, 11, 10, 'test-report/*.xml')
+            jshint(10, 11, 10, 'test-report/*.xml')
             findbugs(12, 13, 12)
         }
 
@@ -656,7 +675,7 @@ public class PublisherHelperSpec extends Specification {
         publisherNode.config[0].fauxProjectPath[0].value() == 'faux path'
         publisherNode.config[0].encoding[0].value() == 'default'
         def typeConfigsNode = publisherNode.config[0].typeConfigs[0]
-        typeConfigsNode.entry.size() == 16
+        typeConfigsNode.entry.size() == 17
         def checkstyleNode = typeConfigsNode.entry.find { it.string[0].value() == 'checkstyle'}
         checkstyleNode != null
         checkstyleNode.'hudson.plugins.violations.TypeConfig'[0].type[0].value() == 'checkstyle'
@@ -665,6 +684,14 @@ public class PublisherHelperSpec extends Specification {
         checkstyleNode.'hudson.plugins.violations.TypeConfig'[0].unstable[0].value() == '10'
         checkstyleNode.'hudson.plugins.violations.TypeConfig'[0].usePattern[0].value() == 'true'
         checkstyleNode.'hudson.plugins.violations.TypeConfig'[0].pattern[0].value() == 'test-report/*.xml'
+        def jshintNode = typeConfigsNode.entry.find { it.string[0].value() == 'jshint'}
+        jshintNode != null
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].type[0].value() == 'jshint'
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].min[0].value() == '10'
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].max[0].value() == '11'
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].unstable[0].value() == '10'
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].usePattern[0].value() == 'true'
+        jshintNode.'hudson.plugins.violations.TypeConfig'[0].pattern[0].value() == 'test-report/*.xml'
         def findbugsNode = typeConfigsNode.entry.find { it.string[0].value() == 'findbugs'}
         findbugsNode.'hudson.plugins.violations.TypeConfig'[0].type[0].value() == 'findbugs'
         findbugsNode.'hudson.plugins.violations.TypeConfig'[0].min[0].value() == '12'
@@ -1272,5 +1299,132 @@ public class PublisherHelperSpec extends Specification {
         Node associatedFilesNode = context.publisherNodes[0]
         associatedFilesNode.name() == 'org.jenkinsci.plugins.associatedfiles.AssociatedFilesPublisher'
         associatedFilesNode.associatedFiles[0].value() == '/foo/file/${VARIABLE}'
+    }
+
+    def 'call emma with one argument'() {
+        when:
+        context.emma('coverage-results/coverage.xml')
+
+        then:
+        context.publisherNodes.size() == 1
+        context.publisherNodes[0].name() == 'hudson.plugins.emma.EmmaPublisher'
+        context.publisherNodes[0].includes[0].value() == 'coverage-results/coverage.xml'
+        context.publisherNodes[0].healthReports[0].minClass[0].value() == 0
+        context.publisherNodes[0].healthReports[0].maxClass[0].value() == 100
+        context.publisherNodes[0].healthReports[0].minMethod[0].value() == 0
+        context.publisherNodes[0].healthReports[0].maxMethod[0].value() == 70
+        context.publisherNodes[0].healthReports[0].minBlock[0].value() == 0
+        context.publisherNodes[0].healthReports[0].maxBlock[0].value() == 80
+        context.publisherNodes[0].healthReports[0].minLine[0].value() == 0
+        context.publisherNodes[0].healthReports[0].maxLine[0].value() == 80
+        context.publisherNodes[0].healthReports[0].minCondition[0].value() == 0
+        context.publisherNodes[0].healthReports[0].maxCondition[0].value() == 80
+    }
+
+    def 'call emma with range thresholds'() {
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            classThreshold(5..90)
+            methodThreshold(10..80)
+            blockThreshold(15..75)
+            lineThreshold(20..70)
+            conditionThreshold(25..65)
+        }
+
+        then:
+        context.publisherNodes.size() == 1
+        context.publisherNodes[0].name() == 'hudson.plugins.emma.EmmaPublisher'
+        context.publisherNodes[0].includes[0].value() == 'coverage-results/coverage.xml'
+        context.publisherNodes[0].healthReports[0].minClass[0].value() == 5
+        context.publisherNodes[0].healthReports[0].maxClass[0].value() == 90
+        context.publisherNodes[0].healthReports[0].minMethod[0].value() == 10
+        context.publisherNodes[0].healthReports[0].maxMethod[0].value() == 80
+        context.publisherNodes[0].healthReports[0].minBlock[0].value() == 15
+        context.publisherNodes[0].healthReports[0].maxBlock[0].value() == 75
+        context.publisherNodes[0].healthReports[0].minLine[0].value() == 20
+        context.publisherNodes[0].healthReports[0].maxLine[0].value() == 70
+        context.publisherNodes[0].healthReports[0].minCondition[0].value() == 25
+        context.publisherNodes[0].healthReports[0].maxCondition[0].value() == 65
+    }
+
+    def 'call emma with individual thresholds'() {
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            minClass(5)
+            maxClass(90)
+            minMethod(10)
+            maxMethod(80)
+            minBlock(15)
+            maxBlock(75)
+            minLine(20)
+            maxLine(70)
+            minCondition(25)
+            maxCondition(65)
+        }
+
+        then:
+        context.publisherNodes.size() == 1
+        context.publisherNodes[0].name() == 'hudson.plugins.emma.EmmaPublisher'
+        context.publisherNodes[0].includes[0].value() == 'coverage-results/coverage.xml'
+        context.publisherNodes[0].healthReports[0].minClass[0].value() == 5
+        context.publisherNodes[0].healthReports[0].maxClass[0].value() == 90
+        context.publisherNodes[0].healthReports[0].minMethod[0].value() == 10
+        context.publisherNodes[0].healthReports[0].maxMethod[0].value() == 80
+        context.publisherNodes[0].healthReports[0].minBlock[0].value() == 15
+        context.publisherNodes[0].healthReports[0].maxBlock[0].value() == 75
+        context.publisherNodes[0].healthReports[0].minLine[0].value() == 20
+        context.publisherNodes[0].healthReports[0].maxLine[0].value() == 70
+        context.publisherNodes[0].healthReports[0].minCondition[0].value() == 25
+        context.publisherNodes[0].healthReports[0].maxCondition[0].value() == 65
+    }
+
+    def 'call emma with bad range values'() {
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            minClass(-5)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            minLine(101)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            maxCondition(101)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            maxBlock(-1)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            classThreshold(-5..90)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        context.emma('coverage-results/coverage.xml') {
+            methodThreshold(5..101)
+        }
+
+        then:
+        thrown(IllegalArgumentException)
     }
 }

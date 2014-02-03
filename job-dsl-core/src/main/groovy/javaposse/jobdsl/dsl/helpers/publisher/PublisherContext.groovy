@@ -136,24 +136,45 @@ class PublisherContext implements Context {
     /**
      <hudson.tasks.ArtifactArchiver>
      <artifacts>build/libs/*</artifacts>
+     <excludes>build/libs/bad/*</excludes>
      <latestOnly>false</latestOnly>
+     <allowEmptyArchive>false</allowEmptyArchive>
      </hudson.tasks.ArtifactArchiver>
+
+     Note: allowEmpty is not compatible with jenkins <= 1.480
+
      * @param glob
      * @param excludeGlob
      * @param latestOnly
      */
-    def archiveArtifacts(String glob, String excludeGlob = null, Boolean latestOnlyBoolean = false) {
+    def archiveArtifacts(Closure artifactsClosure) {
+        ArchiveArtifactsContext artifactsContext = new ArchiveArtifactsContext()
+        AbstractContextHelper.executeInContext(artifactsClosure, artifactsContext)
+
         def nodeBuilder = new NodeBuilder()
 
         Node archiverNode = nodeBuilder.'hudson.tasks.ArtifactArchiver' {
-            artifacts glob
-            if (excludeGlob) {
-                excludes excludeGlob
+            artifacts artifactsContext.patternValue
+            latestOnly artifactsContext.latestOnlyValue ? 'true' : 'false'
+
+            if (artifactsContext.allowEmptyValue != null) {
+                allowEmptyArchive artifactsContext.allowEmptyValue ? 'true' : 'false'
             }
-            latestOnly latestOnlyBoolean ? 'true' : 'false'
+
+            if (artifactsContext.excludesValue) {
+                excludes artifactsContext.excludesValue
+            }
         }
 
         publisherNodes << archiverNode
+    }
+
+    def archiveArtifacts(String glob, String excludeGlob = null, Boolean latestOnlyBoolean = false) {
+        archiveArtifacts {
+            pattern glob
+            exclude excludeGlob
+            latestOnly latestOnlyBoolean
+        }
     }
 
     /**
@@ -449,18 +470,26 @@ class PublisherContext implements Context {
      </hudson.tasks.BuildTrigger>
      */
     def downstream(String projectName, String thresholdName = 'SUCCESS') {
-        assert DownstreamContext.THRESHOLD_COLOR_MAP.containsKey(thresholdName), "thresholdName must be one of these values ${DownstreamContext.THRESHOLD_COLOR_MAP.keySet().join(',')}"
+        assert DownstreamContext.THRESHOLD_COLOR_MAP.containsKey(thresholdName) || thresholdName == 'MANUAL', "thresholdName must be one of these values ${DownstreamContext.THRESHOLD_COLOR_MAP.keySet().join(',')},MANUAL"
 
         def nodeBuilder = new NodeBuilder()
-        Node publishNode = nodeBuilder.'hudson.tasks.BuildTrigger' {
-            childProjects projectName
-            threshold {
-                delegate.createNode('name', thresholdName)
-                ordinal DownstreamContext.THRESHOLD_ORDINAL_MAP[thresholdName]
-                color DownstreamContext.THRESHOLD_COLOR_MAP[thresholdName]
+        Node publishNode
+        if (thresholdName == 'MANUAL') {
+            def attr = ['plugin': 'build-pipeline-plugin@1.4.2']
+            publishNode = nodeBuilder.'au.com.centrumsystems.hudson.plugin.buildpipeline.trigger.BuildPipelineTrigger'(attr) {
+                downstreamProjectNames projectName
+                configs ''
+            }
+        } else {
+            publishNode = nodeBuilder.'hudson.tasks.BuildTrigger' {
+                childProjects projectName
+                threshold {
+                    delegate.createNode('name', thresholdName)
+                    ordinal DownstreamContext.THRESHOLD_ORDINAL_MAP[thresholdName]
+                    color DownstreamContext.THRESHOLD_COLOR_MAP[thresholdName]
+                }
             }
         }
-
         publisherNodes << publishNode
     }
 
@@ -828,6 +857,47 @@ class PublisherContext implements Context {
     def associatedFiles(String files = null) {
         publisherNodes << NodeBuilder.newInstance().'org.jenkinsci.plugins.associatedfiles.AssociatedFilesPublisher' {
             delegate.associatedFiles(files)
+        }
+    }
+
+    /**
+     * Configures the Emma Code Coverage plugin
+     *
+     * <publishers>
+     *     <hudson.plugins.emma.EmmaPublisher>
+     *         <includes>coverage-results/coverage.xml</includes>
+     *         <healthReports>
+     *             <minClass>0</minClass>
+     *             <maxClass>100</maxClass>
+     *             <minMethod>0</minMethod>
+     *             <maxMethod>70</maxMethod>
+     *             <minBlock>0</minBlock>
+     *             <maxBlock>80</maxBlock>
+     *             <minLine>0</minLine>
+     *             <maxLine>80</maxLine>
+     *             <minCondition>0</minCondition>
+     *             <maxCondition>0</maxCondition>
+     *         </healthReports>
+     *     </hudson.plugins.emma.EmmaPublisher>
+     */
+    def emma(String fileSet = '', Closure emmaClosure = null) {
+        EmmaContext emmaContext = new EmmaContext()
+        AbstractContextHelper.executeInContext(emmaClosure, emmaContext)
+
+        publisherNodes << NodeBuilder.newInstance().'hudson.plugins.emma.EmmaPublisher' {
+            includes(fileSet)
+            healthReports {
+                minClass(emmaContext.classRange.getFrom())
+                maxClass(emmaContext.classRange.getTo())
+                minMethod(emmaContext.methodRange.getFrom())
+                maxMethod(emmaContext.methodRange.getTo())
+                minBlock(emmaContext.blockRange.getFrom())
+                maxBlock(emmaContext.blockRange.getTo())
+                minLine(emmaContext.lineRange.getFrom())
+                maxLine(emmaContext.lineRange.getTo())
+                minCondition(emmaContext.conditionRange.getFrom())
+                maxCondition(emmaContext.conditionRange.getTo())
+            }
         }
     }
 }

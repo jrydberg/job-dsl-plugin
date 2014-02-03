@@ -270,4 +270,33 @@ class WrapperContext implements Context {
             takeScreenshot(takeScreenshotAtEndOfBuild)
         }
     }
+
+    /**
+     * <pre>
+     * {@code
+     * <project>
+     *     <buildWrappers>
+     *         <org.jenkinsci.plugins.buildnamesetter.BuildNameSetter plugin="build-name-setter@1.3">
+     *             <template>template</template>
+     *         </org.jenkinsci.plugins.buildnamesetter.BuildNameSetter>
+     *     </buildWrappers>
+     * </project>
+     * }
+     *
+     * Sets build name.
+     * @param template The build name template.
+     */
+    def buildName(String expression) {
+        def nodeBuilder = new NodeBuilder()
+        wrapperNodes << nodeBuilder.'org.jenkinsci.plugins.buildnamesetter.BuildNameSetter' {
+            template(expression)
+        }
+    }
+
+    def pipelineVersion(String template, boolean updateName = false) {
+        wrapperNodes << new NodeBuilder().'se.diabol.jenkins.pipeline.PipelineVersionContributor' {
+            versionTemplate template
+            updateDisplayName updateName
+        }
+    }
 }

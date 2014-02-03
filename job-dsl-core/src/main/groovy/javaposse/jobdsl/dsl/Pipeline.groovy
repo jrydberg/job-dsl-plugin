@@ -25,61 +25,38 @@ public class Pipeline {
     private static final Logger LOGGER = Logger.getLogger(Pipeline.getName());
 
     JobManagement jobManagement
-    List<Job> jobs;
+    List<PipelineStage> stages;
     String projectName;
-
+    int totalJobs = 0;
+    
     public Pipeline(JobManagement jobManagement) {
         this.jobManagement = jobManagement;
-        this.jobs = Lists.newArrayList()
-	def jobName = jobManagement.getParameters().get("JOB_NAME");
-	this.projectName = jobName.size() > 0 ? jobName.split("_")[0] : jobName;
+        this.stages = Lists.newArrayList()
     }
 
-    private String makeJobName(int i) {
-    	String.format("%s_%02d", projectName, i);
-    }
-
-    public Job stage(String name, Closure closure) {
+    public PipelineStage stage(String name, Closure closure) {
         LOGGER.log(Level.FINE, "Got closure and have ${jobManagement}")
-        Job job = new Job(jobManagement)
 
-	job.name(makeJobName(jobs.size() + 1))
-	job.displayName(String.format("%s (%s)", projectName, name))
-        job.with(closure)
+        PipelineStage stage = new PipelineStage(jobManagement, totalJobs, name)
+        stage.with(closure)
+        totalJobs += stage.jobs.size()
 
-        // Save jobs, so that we know what to extract XML from
- 	jobs.push(job)
-	return job
+        // Save stages, we chain them together later
+ 	stages.push(stage)
+	return stage
     }
 
     public void chain() {
-        for (int i = 0; i < jobs.size(); i++) {
-            def job = jobs[i]
-	    // pass on workspace from upstream to downstream jobs
-            // includeGlob, excludeGlob, critera, method, overrideDefaultExcludes
-	    job.publishers {
-	        publishCloneWorkspace("**/*", "", "Any", "TAR", true)
-	    }
-	    // clone stuff from previous job
-	    job.scm {
-	        cloneWorkspace(makeJobName(i)); 
-	    }
-	}
-
-        for (int i = 1; i < jobs.size(); i++) {
-            def up = jobs[i - 1]
-            def dn = jobs[i]
-
-	    // trigger downstream job on success
-	    up.publishers {
-	        downstream(dn.name)
-// 	        downstreamParameterized {
-// 	            trigger(dn.name) {
-// 		        gitRevision()
-//                         //subversionRevision()
-//                         currentBuild()
-//                     }
-// 	        }
+        stages.each { it.chain() }
+        
+        stages.size > 1 && stages[1..-1].eachWithIndex { dn, i ->
+            def up = stages[i]
+            up.jobs[-1].publishers {
+                downstream(dn.jobs[0].name, dn.manual ? 'MANUAL' : 'SUCCESS')
+                archiveArtifacts {
+                    pattern up.getArtifacts() ?: '**'
+                    allowEmpty true
+                }
             }
         }
     }

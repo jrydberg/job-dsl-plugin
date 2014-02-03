@@ -16,7 +16,7 @@ pipeline {
     }
   }
 
-  stage("deploy"") {
+  stage("deploy") {
     task("install") {
       steps {
         shell("make install")

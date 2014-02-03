@@ -9,11 +9,19 @@ This is a version of the Jenkins Job DSL plugin that extends it with a "pipeline
 
 pipeline {
   stage("build") {
-    shell("make")
+    task("compile") {
+      steps {
+        shell("make")
+      }
+    }
   }
 
-  stage("install") {
-    shell("make install")
+  stage("deploy"") {
+    task("install") {
+      steps {
+        shell("make install")
+      }
+    }
   }
 }
 ```
